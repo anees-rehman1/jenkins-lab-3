@@ -1,8 +1,6 @@
 pipeline {
     agent any
     
-    // REMOVED: ansiColor('xterm') - Install AnsiColor plugin if you want colors
-    // For now, using only built-in options
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timeout(time: 30, unit: 'MINUTES')
@@ -79,12 +77,12 @@ pipeline {
             steps {
                 echo 'Building application...'
                 sh 'echo "Build completed for ${APP_NAME}"'
-                sh 'echo "Environment: ${params.DEPLOY_ENV}"'
+                // FIXED: Use echo step for Groovy variable interpolation
+                echo "Environment: ${params.DEPLOY_ENV}"
             }
         }
         
         stage('Test') {
-            // FIXED: Proper 'when' condition syntax with 'expression'
             when {
                 expression { params.SKIP_TESTS == false }
             }

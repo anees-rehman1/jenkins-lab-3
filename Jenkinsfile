@@ -8,6 +8,8 @@ pipeline {
     environment {
         APP_NAME = 'jenkins-demo-app'
         BUILD_NUMBER_ENV = "${BUILD_NUMBER}"
+        // 🔥 KEY FIX: Use unique port per build
+        APP_PORT = "${3000 + BUILD_NUMBER.toInteger()}"
     }
     
     stages {
@@ -20,33 +22,40 @@ pipeline {
             }
         }
         
+        stage('Pre-Cleanup') {
+            steps {
+                echo '🔥 Killing all node processes...'
+                // 🔥 KEY FIX: Use 'pkill -9 node' not 'pkill -f node app.js'
+                sh 'pkill -9 node || true'
+                sh 'sleep 3'
+            }
+        }
+        
         stage('Build') {
             steps {
                 echo 'Building the application...'
                 sh 'npm install'
-                sh 'echo "Build completed successfully"'
+                echo 'Build completed successfully'
             }
         }
         
         stage('Test') {
             steps {
-                echo 'Running tests...'
+                echo "Running tests on port ${APP_PORT}..."
                 script {
-                    // Start the application in background
-                    sh 'nohup npm start > app.log 2>&1 &'
-                    sh 'sleep 5'  // Wait for app to start
+                    // 🔥 KEY FIX: Use APP_PORT environment variable
+                    sh "PORT=${APP_PORT} nohup node app.js > app.log 2>&1 &"
+                    sh 'sleep 5'
                     
-                    // Run tests
-                    sh 'npm test'
-                    
-                    // Stop the application
-                    sh 'pkill -f "node app.js" || true'
+                    // 🔥 KEY FIX: Pass PORT to npm test
+                    sh "PORT=${APP_PORT} npm test"
                 }
             }
             post {
                 always {
-                    echo 'Cleaning up test processes...'
-                    sh 'pkill -f "node app.js" || true'
+                    echo 'Cleaning up...'
+                    sh 'pkill -9 node || true'
+                    sh 'sleep 2'
                 }
             }
         }
@@ -54,17 +63,10 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo 'Deploying application...'
-                script {
-                    // Create deployment directory
-                    sh 'mkdir -p /tmp/deployment'
-                    
-                    // Copy application files
-                    sh 'cp -r * /tmp/deployment/ || true'
-                    
-                    // Simulate deployment
-                    sh 'echo "Application deployed to /tmp/deployment"'
-                    sh 'ls -la /tmp/deployment'
-                }
+                sh 'mkdir -p /tmp/deployment'
+                sh 'cp -r * /tmp/deployment/ || true'
+                sh 'echo "Application deployed to /tmp/deployment"'
+                sh 'ls -la /tmp/deployment'
             }
         }
     }
@@ -73,6 +75,7 @@ pipeline {
         always {
             echo 'Pipeline execution completed!'
             sh 'echo "Build Number: ${BUILD_NUMBER_ENV}"'
+            sh 'pkill -9 node || true'
         }
         success {
             echo 'Pipeline executed successfully! ✅'
